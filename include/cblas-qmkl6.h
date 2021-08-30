@@ -31,6 +31,10 @@ typedef enum {
   CblasUnit = 132,
 } CBLAS_DIAG;
 
+/* qmkl6.cpp */
+
+struct rpimemmgr *qmkl6_borrow_rpimemmgr(void);
+
 /* support.cpp */
 
 typedef void (*MKLExitHandler)(int why);

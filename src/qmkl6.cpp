@@ -148,3 +148,7 @@ void qmkl6_context::wait_for_handles(const uint64_t timeout_ns,
   }
   va_end(ap);
 }
+
+struct rpimemmgr *qmkl6_borrow_rpimemmgr(void) {
+  return &qmkl6.rpimemmgr;
+}

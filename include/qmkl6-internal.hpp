@@ -20,6 +20,8 @@ class qmkl6_context {
  public:
   MKLExitHandler exit_handler = exit;
 
+  struct rpimemmgr rpimemmgr;
+
   /*
    * mkl_malloc has an alignment option, but librpimemmgr allocator does not
    * support it.
@@ -78,8 +80,6 @@ class qmkl6_context {
   }
 
  private:
-  struct rpimemmgr rpimemmgr;
-
   int drm_fd;
 
   size_t unif_size;
