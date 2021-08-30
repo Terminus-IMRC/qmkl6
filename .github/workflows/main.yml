@@ -4,7 +4,7 @@ jobs:
 
   code-format-c-cpp:
     runs-on: ubuntu-latest
-    container: ubuntu:focal
+    container: debian:bullseye-slim
     steps:
       - name: Install required packages
         env:
@@ -23,23 +23,25 @@ jobs:
 
   code-format-py:
     runs-on: ubuntu-latest
+    container: debian:bullseye-slim
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
-      - name: Install autopep8
+      - name: Install required packages
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          pip3 install autopep8
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git python3-autopep8
+          apt-get clean
+          rm -rf /var/lib/apt/lists/*
           autopep8 --version
+      - uses: actions/checkout@v2
       - name: Run autopep8
         run: git ls-files '*.py' | xargs autopep8 --diff --exit-code
 
   run-tests:
     runs-on: ubuntu-latest
-    container: debian:buster
+    container: debian:bullseye-slim
     steps:
-      - uses: actions/checkout@v2
       - name: Install required packages
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -48,6 +50,7 @@ jobs:
           apt-get install -y --no-install-recommends build-essential clang pkg-config cmake libblas-dev libopenblas-dev libatlas-base-dev libfftw3-dev
           apt-get clean
           rm -rf /var/lib/apt/lists/*
+      - uses: actions/checkout@v2
       - name: Build tests
         run: |
           mkdir build/

@@ -407,9 +407,9 @@ static int test_fft_c2c_single(const enum fft_impl<T>::domain domain,
   std::uniform_real_distribution<T> dist;
 
   printf("%s %s: n = %7d: ",
-         (domain == fft_impl<T>::DOMAIN_COMPLEX)
-             ? "c2c"
-             : (direction == fft_impl<T>::DIRECTION_FORWARD) ? "r2c" : "c2r",
+         (domain == fft_impl<T>::DOMAIN_COMPLEX)         ? "c2c"
+         : (direction == fft_impl<T>::DIRECTION_FORWARD) ? "r2c"
+                                                         : "c2r",
          (direction == fft_impl<T>::DIRECTION_FORWARD) ? "forw" : "back", n);
 
   U *in0 = new U[n], *out0 = new U[n];
