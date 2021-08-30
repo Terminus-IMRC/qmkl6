@@ -8,4 +8,4 @@ Version: @CPACK_PACKAGE_VERSION@
 
 Cflags: -I${includedir}
 Libs: -L${libdir} -lqmkl6
-Requires.private: libdrm_v3d
+Requires.private: libdrm_v3d librpimemmgr

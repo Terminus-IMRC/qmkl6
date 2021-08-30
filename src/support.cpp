@@ -33,23 +33,17 @@ void* mkl_malloc(const size_t alloc_size, int alignment) {
 
   const size_t alloc_size_aligned = alloc_size + alignment - 1;
 
-  uint32_t handle, bus_addr;
-  void* const virt_addr =
-      qmkl6.alloc_memory(alloc_size_aligned, handle, bus_addr);
+  uint32_t bus_addr;
+  void* const virt_addr = qmkl6.alloc_memory(alloc_size_aligned, bus_addr);
 
   /* bus_addr + offset ≡ 0 (mod alignment) */
   const uint32_t offset = -bus_addr & (alignment - 1);
   void* const virt_addr_aligned = (void*)((uintptr_t)virt_addr + offset);
 
-  struct qmkl6_context::memory_area area = {
-      .alloc_size = alloc_size,
-      .alloc_size_aligned = alloc_size_aligned,
-      .handle = handle,
-      .bus_addr_aligned = bus_addr + offset,
-      .virt_addr = virt_addr,
-  };
-
-  qmkl6.memory_map.emplace(virt_addr_aligned, area);
+  if (!qmkl6.aligned_memory_map.emplace(virt_addr_aligned, virt_addr).second) {
+    fprintf(stderr, "error: Memory address %p is already in map\n", virt_addr);
+    XERBLA(1);
+  }
 
   return virt_addr_aligned;
 }
@@ -63,16 +57,15 @@ void* mkl_calloc(const size_t num, const size_t size, const int alignment) {
 void mkl_free(void* const a_ptr) {
   if (a_ptr == NULL) return;
 
-  const auto area = qmkl6.memory_map.find(a_ptr);
-  if (area == qmkl6.memory_map.end()) {
+  const auto area = qmkl6.aligned_memory_map.find(a_ptr);
+  if (area == qmkl6.aligned_memory_map.end()) {
     fprintf(stderr, "error: Memory area starting at %p is not known\n", a_ptr);
     XERBLA(1);
   }
 
-  qmkl6.free_memory(area->second.alloc_size_aligned, area->second.handle,
-                    area->second.virt_addr);
+  qmkl6.free_memory(area->second);
 
-  qmkl6.memory_map.erase(area);
+  qmkl6.aligned_memory_map.erase(area);
 }
 
 void qmkl6_context::init_support(void) {}

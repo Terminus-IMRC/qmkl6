@@ -16,7 +16,8 @@ pkg_check_modules(mkl mkl-dynamic-lp64-iomp)
 
 if (NOT NO_QMKL6)
     set(qmkl6_FOUND TRUE)
-    set(qmkl6_LINK_LIBRARIES ${DRM_V3D_LINK_LIBRARIES} qmkl6)
+    set(qmkl6_LINK_LIBRARIES ${DRM_V3D_LINK_LIBRARIES}
+                             ${RPIMEMMGR_LINK_LIBRARIES} qmkl6)
 endif (NOT NO_QMKL6)
 
 foreach (blas IN ITEMS qmkl6 netlib openblas atlas mkl)

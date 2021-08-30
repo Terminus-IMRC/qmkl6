@@ -75,13 +75,11 @@ void cblas_sgemv(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE trans,
   const int xlen_qpu = use_qpu ? xlen / split_x * split_x : 0;
   const int ylen_qpu = use_qpu ? ylen / split_y * split_y : 0;
 
-  uint32_t a_handle, x_handle, y_handle;
-  uint32_t a_bus, x_bus, y_bus;
+  uint32_t y_handle;
 
   if (use_qpu) {
-    qmkl6.locate_virt((void *)a, a_handle, a_bus);
-    qmkl6.locate_virt((void *)x, x_handle, x_bus);
-    qmkl6.locate_virt((void *)y, y_handle, y_bus);
+    const uint32_t a_bus = qmkl6.locate_virt(a), x_bus = qmkl6.locate_virt(x),
+                   y_bus = qmkl6.locate_virt(y, y_handle);
 
     qmkl6.unif[0] = incx;
     qmkl6.unif[1] = x_bus;
@@ -167,11 +165,11 @@ void cblas_stbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
   const int n_rem = n % align;
   n -= n_rem;
 
-  uint32_t a_handle, x_handle, a_bus, x_bus;
+  uint32_t x_handle;
 
   if (n > 0) {
-    qmkl6.locate_virt((void *)a, a_handle, a_bus);
-    qmkl6.locate_virt((void *)x, x_handle, x_bus);
+    const uint32_t a_bus = qmkl6.locate_virt(a),
+                   x_bus = qmkl6.locate_virt(x, x_handle);
 
     qmkl6.unif[0] = n;
     qmkl6.unif[1] = a_bus;
@@ -219,11 +217,11 @@ void cblas_ctbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
   const int n_rem = n % align;
   n -= n_rem;
 
-  uint32_t a_handle, x_handle, a_bus, x_bus;
+  uint32_t x_handle;
 
   if (n > 0) {
-    qmkl6.locate_virt(a, a_handle, a_bus);
-    qmkl6.locate_virt(x, x_handle, x_bus);
+    const uint32_t a_bus = qmkl6.locate_virt(a),
+                   x_bus = qmkl6.locate_virt(x, x_handle);
 
     qmkl6.unif[0] = n;
     qmkl6.unif[1] = a_bus;
@@ -244,26 +242,24 @@ void cblas_ctbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
 }
 
 void qmkl6_context::init_blas2(void) {
-  qpu_sgemv_n = (uint64_t *)alloc_memory(sizeof(qpu_sgemv_n_orig),
-                                         qpu_sgemv_n_handle, qpu_sgemv_n_bus);
+  qpu_sgemv_n =
+      (uint64_t *)alloc_memory(sizeof(qpu_sgemv_n_orig), qpu_sgemv_n_bus);
   memcpy(qpu_sgemv_n, qpu_sgemv_n_orig, sizeof(qpu_sgemv_n_orig));
 
-  qpu_sgemv_t = (uint64_t *)alloc_memory(sizeof(qpu_sgemv_t_orig),
-                                         qpu_sgemv_t_handle, qpu_sgemv_t_bus);
+  qpu_sgemv_t =
+      (uint64_t *)alloc_memory(sizeof(qpu_sgemv_t_orig), qpu_sgemv_t_bus);
   memcpy(qpu_sgemv_t, qpu_sgemv_t_orig, sizeof(qpu_sgemv_t_orig));
 
-  qpu_stbmv = (uint64_t *)alloc_memory(sizeof(qpu_stbmv_orig), qpu_stbmv_handle,
-                                       qpu_stbmv_bus);
+  qpu_stbmv = (uint64_t *)alloc_memory(sizeof(qpu_stbmv_orig), qpu_stbmv_bus);
   memcpy(qpu_stbmv, qpu_stbmv_orig, sizeof(qpu_stbmv_orig));
 
-  qpu_ctbmv = (uint64_t *)alloc_memory(sizeof(qpu_ctbmv_orig), qpu_ctbmv_handle,
-                                       qpu_ctbmv_bus);
+  qpu_ctbmv = (uint64_t *)alloc_memory(sizeof(qpu_ctbmv_orig), qpu_ctbmv_bus);
   memcpy(qpu_ctbmv, qpu_ctbmv_orig, sizeof(qpu_ctbmv_orig));
 }
 
 void qmkl6_context::finalize_blas2(void) {
-  free_memory(sizeof(qpu_ctbmv_orig), qpu_ctbmv_handle, qpu_ctbmv);
-  free_memory(sizeof(qpu_stbmv_orig), qpu_stbmv_handle, qpu_stbmv);
-  free_memory(sizeof(qpu_sgemv_t_orig), qpu_sgemv_t_handle, qpu_sgemv_t);
-  free_memory(sizeof(qpu_sgemv_n_orig), qpu_sgemv_n_handle, qpu_sgemv_n);
+  free_memory(qpu_ctbmv);
+  free_memory(qpu_stbmv);
+  free_memory(qpu_sgemv_t);
+  free_memory(qpu_sgemv_n);
 }

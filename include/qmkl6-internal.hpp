@@ -1,8 +1,13 @@
 #ifndef _QMKL6_INTERNAL_HPP_
 #define _QMKL6_INTERNAL_HPP_
 
+extern "C" {
+#include <rpimemmgr.h>
+}
+
+#include <cstdint>
 #include <cstring>
-#include <map>
+#include <unordered_map>
 
 #define XERBLA(info)                        \
   do {                                      \
@@ -15,23 +20,17 @@ class qmkl6_context {
  public:
   MKLExitHandler exit_handler = exit;
 
-  struct memory_area {
-    size_t alloc_size, alloc_size_aligned;
-    uint32_t handle, bus_addr_aligned;
-    void *virt_addr;
-  };
+  /*
+   * mkl_malloc has an alignment option, but librpimemmgr allocator does not
+   * support it.
+   * It however supports locating handle and bus address associated with virtual
+   * address with an offset, so this hash map (from aligned to non-aligned
+   * memory area) is only referenced when freeing memory with mkl_free.
+   */
 
-  std::map<const void *, struct memory_area> memory_map;
+  std::unordered_map<void *, void *> aligned_memory_map;
 
-  uint32_t unif_handle, qpu_sasum_handle, qpu_saxpy_handle, qpu_scopy_handle,
-      qpu_sdot_handle, qpu_snrm2_handle, qpu_sscal_handle, qpu_sgemv_n_handle,
-      qpu_sgemv_t_handle, qpu_stbmv_handle, qpu_ctbmv_handle,
-      qpu_sgemm_rnn_handle, qpu_sgemm_rnt_handle, qpu_sgemm_rtn_handle,
-      qpu_sgemm_rtt_handle, qpu_somatcopy_n_handle, qpu_somatcopy_t_4x4_handle,
-      qpu_somatcopy_t_256x32_handle, qpu_comatcopy_n_handle,
-      qpu_comatcopy_t_4x4_handle, qpu_comatcopy_t_128x32_handle,
-      qpu_fft2_handle, qpu_fft4_forw_handle, qpu_fft4_back_handle,
-      qpu_fft8_forw_handle, qpu_fft8_back_handle;
+  uint32_t unif_handle;
   uint32_t unif_bus, qpu_sasum_bus, qpu_saxpy_bus, qpu_scopy_bus, qpu_sdot_bus,
       qpu_snrm2_bus, qpu_sscal_bus, qpu_sgemv_n_bus, qpu_sgemv_t_bus,
       qpu_stbmv_bus, qpu_ctbmv_bus, qpu_sgemm_rnn_bus, qpu_sgemm_rnt_bus,
@@ -58,11 +57,11 @@ class qmkl6_context {
   void execute_qpu_code(uint32_t qpu_code_bus, uint32_t unif_bus,
                         unsigned num_qpus, unsigned num_handles, ...);
   void wait_for_handles(uint64_t timeout_ns, unsigned num_handles, ...);
+  void *alloc_memory(size_t size, uint32_t &bus_addr);
   void *alloc_memory(size_t size, uint32_t &handle, uint32_t &bus_addr);
-  void *alloc_memory(size_t size, uint32_t &handle, uint32_t &bus_addr,
-                     uint64_t &mmap_offset);
-  void free_memory(size_t size, uint32_t handle, void *map);
-  void locate_virt(const void *virt_addr, uint32_t &handle, uint32_t &bus_addr);
+  void free_memory(void *virt_addr);
+  uint32_t locate_virt(const void *virt_addr);
+  uint32_t locate_virt(const void *virt_addr, uint32_t &handle);
 
   template <typename T, typename U>
   T bit_cast(const U u) {
@@ -79,6 +78,8 @@ class qmkl6_context {
   }
 
  private:
+  struct rpimemmgr rpimemmgr;
+
   int drm_fd;
 
   size_t unif_size;

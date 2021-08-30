@@ -35,9 +35,10 @@ $ sudo dpkg -i raspberrypi-kernel_1.20200601-1_armhf.deb
 $ sudo reboot
 ```
 
-To build and run QMKL6, you need to install
-[py-videocore6](https://github.com/Idein/py-videocore6) and
-[libdrm_v3d](https://github.com/Idein/libdrm_v3d) in advance.
+To build and run QMKL6, you need to install these softwares in advance:
+- [py-videocore6](https://github.com/Idein/py-videocore6)
+- [libdrm_v3d](https://github.com/Idein/libdrm_v3d)
+- [librpimemmgr](https://github.com/Idein/librpimemmgr)
 
 QMKL6 communicates with the QPU through `/dev/dri/card0`, which is exposed by
 the V3D DRM kernel driver.

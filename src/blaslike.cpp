@@ -94,11 +94,9 @@ void cblas_somatcopy(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE trans,
     XERBLA(1);
   }
 
-  uint32_t a_handle, b_handle;
-  uint32_t a_bus, b_bus;
-
-  qmkl6.locate_virt((void*)a, a_handle, a_bus);
-  qmkl6.locate_virt((void*)b, b_handle, b_bus);
+  uint32_t b_handle;
+  const uint32_t a_bus = qmkl6.locate_virt(a),
+                 b_bus = qmkl6.locate_virt(b, b_handle);
 
   qmkl6.unif[0] = (layout == CblasRowMajor) ? rows : cols;
   qmkl6.unif[1] = (layout == CblasRowMajor) ? cols : rows;
@@ -108,13 +106,11 @@ void cblas_somatcopy(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE trans,
   qmkl6.unif[5] = b_bus;
   qmkl6.unif[6] = 4 * ldb;
 
-  qmkl6.execute_qpu_code(
-      (trans == CblasNoTrans)
-          ? qmkl6.qpu_somatcopy_n_bus
-          : (qmkl6.unif[0] % 256 == 0 && qmkl6.unif[1] % 32 == 0)
-                ? qmkl6.qpu_somatcopy_t_256x32_bus
-                : qmkl6.qpu_somatcopy_t_4x4_bus,
-      qmkl6.unif_bus, num_qpus, 1, b_handle);
+  qmkl6.execute_qpu_code((trans == CblasNoTrans) ? qmkl6.qpu_somatcopy_n_bus
+                         : (qmkl6.unif[0] % 256 == 0 && qmkl6.unif[1] % 32 == 0)
+                             ? qmkl6.qpu_somatcopy_t_256x32_bus
+                             : qmkl6.qpu_somatcopy_t_4x4_bus,
+                         qmkl6.unif_bus, num_qpus, 1, b_handle);
 
   qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, b_handle);
 }
@@ -181,11 +177,9 @@ void cblas_comatcopy(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE trans,
     XERBLA(1);
   }
 
-  uint32_t a_handle, b_handle;
-  uint32_t a_bus, b_bus;
-
-  qmkl6.locate_virt((void*)a, a_handle, a_bus);
-  qmkl6.locate_virt((void*)b, b_handle, b_bus);
+  uint32_t b_handle;
+  const uint32_t a_bus = qmkl6.locate_virt(a),
+                 b_bus = qmkl6.locate_virt(b, b_handle);
 
   qmkl6.unif[0] = (layout == CblasRowMajor) ? rows : cols;
   qmkl6.unif[1] = (layout == CblasRowMajor) ? cols : rows;
@@ -196,60 +190,50 @@ void cblas_comatcopy(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE trans,
   qmkl6.unif[6] = b_bus;
   qmkl6.unif[7] = 8 * ldb;
 
-  qmkl6.execute_qpu_code(
-      (trans == CblasNoTrans)
-          ? qmkl6.qpu_comatcopy_n_bus
-          : (qmkl6.unif[0] % 128 == 0 && qmkl6.unif[1] % 32 == 0)
-                ? qmkl6.qpu_comatcopy_t_128x32_bus
-                : qmkl6.qpu_comatcopy_t_4x4_bus,
-      qmkl6.unif_bus, num_qpus, 1, b_handle);
+  qmkl6.execute_qpu_code((trans == CblasNoTrans) ? qmkl6.qpu_comatcopy_n_bus
+                         : (qmkl6.unif[0] % 128 == 0 && qmkl6.unif[1] % 32 == 0)
+                             ? qmkl6.qpu_comatcopy_t_128x32_bus
+                             : qmkl6.qpu_comatcopy_t_4x4_bus,
+                         qmkl6.unif_bus, num_qpus, 1, b_handle);
 
   qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, b_handle);
 }
 
 void qmkl6_context::init_blaslike(void) {
-  qpu_somatcopy_n =
-      (uint64_t*)alloc_memory(sizeof(qpu_somatcopy_n_orig),
-                              qpu_somatcopy_n_handle, qpu_somatcopy_n_bus);
-  qpu_somatcopy_t_4x4 = (uint64_t*)alloc_memory(
-      sizeof(qpu_somatcopy_t_4x4_orig), qpu_somatcopy_t_4x4_handle,
-      qpu_somatcopy_t_4x4_bus);
-  qpu_somatcopy_t_256x32 = (uint64_t*)alloc_memory(
-      sizeof(qpu_somatcopy_t_256x32_orig), qpu_somatcopy_t_256x32_handle,
-      qpu_somatcopy_t_256x32_bus);
-  qpu_comatcopy_n =
-      (uint64_t*)alloc_memory(sizeof(qpu_comatcopy_n_orig),
-                              qpu_comatcopy_n_handle, qpu_comatcopy_n_bus);
-  qpu_comatcopy_t_4x4 = (uint64_t*)alloc_memory(
-      sizeof(qpu_comatcopy_t_4x4_orig), qpu_comatcopy_t_4x4_handle,
-      qpu_comatcopy_t_4x4_bus);
-  qpu_comatcopy_t_128x32 = (uint64_t*)alloc_memory(
-      sizeof(qpu_comatcopy_t_128x32_orig), qpu_comatcopy_t_128x32_handle,
-      qpu_comatcopy_t_128x32_bus);
-
+  qpu_somatcopy_n = (uint64_t*)alloc_memory(sizeof(qpu_somatcopy_n_orig),
+                                            qpu_somatcopy_n_bus);
   memcpy(qpu_somatcopy_n, qpu_somatcopy_n_orig, sizeof(qpu_somatcopy_n_orig));
+
+  qpu_somatcopy_t_4x4 = (uint64_t*)alloc_memory(
+      sizeof(qpu_somatcopy_t_4x4_orig), qpu_somatcopy_t_4x4_bus);
   memcpy(qpu_somatcopy_t_4x4, qpu_somatcopy_t_4x4_orig,
          sizeof(qpu_somatcopy_t_4x4_orig));
+
+  qpu_somatcopy_t_256x32 = (uint64_t*)alloc_memory(
+      sizeof(qpu_somatcopy_t_256x32_orig), qpu_somatcopy_t_256x32_bus);
   memcpy(qpu_somatcopy_t_256x32, qpu_somatcopy_t_256x32_orig,
          sizeof(qpu_somatcopy_t_256x32_orig));
+
+  qpu_comatcopy_n = (uint64_t*)alloc_memory(sizeof(qpu_comatcopy_n_orig),
+                                            qpu_comatcopy_n_bus);
   memcpy(qpu_comatcopy_n, qpu_comatcopy_n_orig, sizeof(qpu_comatcopy_n_orig));
+
+  qpu_comatcopy_t_4x4 = (uint64_t*)alloc_memory(
+      sizeof(qpu_comatcopy_t_4x4_orig), qpu_comatcopy_t_4x4_bus);
   memcpy(qpu_comatcopy_t_4x4, qpu_comatcopy_t_4x4_orig,
          sizeof(qpu_comatcopy_t_4x4_orig));
+
+  qpu_comatcopy_t_128x32 = (uint64_t*)alloc_memory(
+      sizeof(qpu_comatcopy_t_128x32_orig), qpu_comatcopy_t_128x32_bus);
   memcpy(qpu_comatcopy_t_128x32, qpu_comatcopy_t_128x32_orig,
          sizeof(qpu_comatcopy_t_128x32_orig));
 }
 
 void qmkl6_context::finalize_blaslike(void) {
-  free_memory(sizeof(qpu_comatcopy_t_128x32_orig),
-              qpu_comatcopy_t_128x32_handle, qpu_comatcopy_t_128x32);
-  free_memory(sizeof(qpu_comatcopy_t_4x4_orig), qpu_comatcopy_t_4x4_handle,
-              qpu_comatcopy_t_4x4);
-  free_memory(sizeof(qpu_comatcopy_n_orig), qpu_comatcopy_n_handle,
-              qpu_comatcopy_n);
-  free_memory(sizeof(qpu_somatcopy_t_256x32_orig),
-              qpu_somatcopy_t_256x32_handle, qpu_somatcopy_t_256x32);
-  free_memory(sizeof(qpu_somatcopy_t_4x4_orig), qpu_somatcopy_t_4x4_handle,
-              qpu_somatcopy_t_4x4);
-  free_memory(sizeof(qpu_somatcopy_n_orig), qpu_somatcopy_n_handle,
-              qpu_somatcopy_n);
+  free_memory(qpu_comatcopy_t_128x32);
+  free_memory(qpu_comatcopy_t_4x4);
+  free_memory(qpu_comatcopy_n);
+  free_memory(qpu_somatcopy_t_256x32);
+  free_memory(qpu_somatcopy_t_4x4);
+  free_memory(qpu_somatcopy_n);
 }

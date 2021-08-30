@@ -35,7 +35,7 @@ struct fftwf_plan_s {
   unsigned flags;
   size_t twiddle_size;
 
-  uint32_t unif_handle, twiddle_handle, in_handle, out_handle, temp_handle;
+  uint32_t out_handle;
   uint32_t code_bus, unif_bus, twiddle_bus, in_bus, out_bus, temp_bus;
   uint32_t *unif;
   std::complex<float> *twiddle, *in, *out, *temp;
@@ -136,10 +136,10 @@ fftwf_plan fftwf_plan_dft_1d(const int n, fftwf_complex *in, fftwf_complex *out,
 
   plan->in = (std::complex<float> *)in;
   plan->out = (std::complex<float> *)out;
-  qmkl6.locate_virt((void *)in, plan->in_handle, plan->in_bus);
-  qmkl6.locate_virt((void *)out, plan->out_handle, plan->out_bus);
+  plan->in_bus = qmkl6.locate_virt(in);
+  plan->out_bus = qmkl6.locate_virt(out, plan->out_handle);
   plan->temp = (std::complex<float> *)qmkl6.alloc_memory(
-      sizeof(*plan->temp) * n, plan->temp_handle, plan->temp_bus);
+      sizeof(*plan->temp) * n, plan->temp_bus);
 
   if (plan->log2n % 3 == 0 && n >= 64) {
     plan->radix = 8;
@@ -160,15 +160,15 @@ fftwf_plan fftwf_plan_dft_1d(const int n, fftwf_complex *in, fftwf_complex *out,
     plan->twiddle_size = sizeof(plan->twiddle[0]) * (n - 1);
   }
 
-  plan->twiddle = (std::complex<float> *)qmkl6.alloc_memory(
-      plan->twiddle_size, plan->twiddle_handle, plan->twiddle_bus);
+  plan->twiddle = (std::complex<float> *)qmkl6.alloc_memory(plan->twiddle_size,
+                                                            plan->twiddle_bus);
   if (plan->radix == 2 || plan->radix == 4)
     prepare_twiddle_2_or_4(plan->twiddle, n, plan->radix, sign);
   else
     prepare_twiddle_8(plan->twiddle, n, plan->radix, sign);
 
-  plan->unif = (uint32_t *)qmkl6.alloc_memory(
-      sizeof(*plan->unif) * 16, plan->unif_handle, plan->unif_bus);
+  plan->unif =
+      (uint32_t *)qmkl6.alloc_memory(sizeof(*plan->unif) * 16, plan->unif_bus);
   plan->unif[0] = n;
   /* unif[1..3] are set on execution. */
   if (plan->radix == 8) {
@@ -197,10 +197,9 @@ void fftwf_execute(const fftwf_plan plan) {
 
 void fftwf_execute_dft(const fftwf_plan plan, fftwf_complex *const in,
                        fftwf_complex *const out) {
-  uint32_t in_bus, out_bus;
-  uint32_t in_handle, out_handle;
-  qmkl6.locate_virt((void *)in, in_handle, in_bus);
-  qmkl6.locate_virt((void *)out, out_handle, out_bus);
+  uint32_t out_handle;
+  const uint32_t in_bus = qmkl6.locate_virt(in),
+                 out_bus = qmkl6.locate_virt(out, out_handle);
 
   plan->unif[1] = in_bus;
   if (plan->is_swapped) {
@@ -216,35 +215,37 @@ void fftwf_execute_dft(const fftwf_plan plan, fftwf_complex *const in,
 }
 
 void fftwf_destroy_plan(fftwf_plan plan) {
-  qmkl6.free_memory(sizeof(*plan->unif) * 16, plan->unif_handle, plan->unif);
-  qmkl6.free_memory(plan->twiddle_size, plan->twiddle_handle, plan->twiddle);
-  qmkl6.free_memory(sizeof(*plan->temp) * plan->n, plan->temp_handle,
-                    plan->temp);
+  qmkl6.free_memory(plan->unif);
+  qmkl6.free_memory(plan->twiddle);
+  qmkl6.free_memory(plan->temp);
   delete plan;
 }
 
 void qmkl6_context::init_fft(void) {
-  qpu_fft2 = (uint64_t *)alloc_memory(sizeof(qpu_fft2_orig), qpu_fft2_handle,
-                                      qpu_fft2_bus);
-  qpu_fft4_forw = (uint64_t *)alloc_memory(
-      sizeof(qpu_fft4_forw_orig), qpu_fft4_forw_handle, qpu_fft4_forw_bus);
-  qpu_fft4_back = (uint64_t *)alloc_memory(
-      sizeof(qpu_fft4_back_orig), qpu_fft4_back_handle, qpu_fft4_back_bus);
-  qpu_fft8_forw = (uint64_t *)alloc_memory(
-      sizeof(qpu_fft8_forw_orig), qpu_fft8_forw_handle, qpu_fft8_forw_bus);
-  qpu_fft8_back = (uint64_t *)alloc_memory(
-      sizeof(qpu_fft8_back_orig), qpu_fft8_back_handle, qpu_fft8_back_bus);
+  qpu_fft2 = (uint64_t *)alloc_memory(sizeof(qpu_fft2_orig), qpu_fft2_bus);
   memcpy(qpu_fft2, qpu_fft2_orig, sizeof(qpu_fft2_orig));
+
+  qpu_fft4_forw =
+      (uint64_t *)alloc_memory(sizeof(qpu_fft4_forw_orig), qpu_fft4_forw_bus);
   memcpy(qpu_fft4_forw, qpu_fft4_forw_orig, sizeof(qpu_fft4_forw_orig));
+
+  qpu_fft4_back =
+      (uint64_t *)alloc_memory(sizeof(qpu_fft4_back_orig), qpu_fft4_back_bus);
   memcpy(qpu_fft4_back, qpu_fft4_back_orig, sizeof(qpu_fft4_back_orig));
+
+  qpu_fft8_forw =
+      (uint64_t *)alloc_memory(sizeof(qpu_fft8_forw_orig), qpu_fft8_forw_bus);
   memcpy(qpu_fft8_forw, qpu_fft8_forw_orig, sizeof(qpu_fft8_forw_orig));
+
+  qpu_fft8_back =
+      (uint64_t *)alloc_memory(sizeof(qpu_fft8_back_orig), qpu_fft8_back_bus);
   memcpy(qpu_fft8_back, qpu_fft8_back_orig, sizeof(qpu_fft8_back_orig));
 }
 
 void qmkl6_context::finalize_fft(void) {
-  free_memory(sizeof(qpu_fft8_back_orig), qpu_fft8_back_handle, qpu_fft8_back);
-  free_memory(sizeof(qpu_fft8_forw_orig), qpu_fft8_forw_handle, qpu_fft8_forw);
-  free_memory(sizeof(qpu_fft4_back_orig), qpu_fft4_back_handle, qpu_fft4_back);
-  free_memory(sizeof(qpu_fft4_forw_orig), qpu_fft4_forw_handle, qpu_fft4_forw);
-  free_memory(sizeof(qpu_fft2_orig), qpu_fft2_handle, qpu_fft2);
+  free_memory(qpu_fft8_back);
+  free_memory(qpu_fft8_forw);
+  free_memory(qpu_fft4_back);
+  free_memory(qpu_fft4_forw);
+  free_memory(qpu_fft2);
 }

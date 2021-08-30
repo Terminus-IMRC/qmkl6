@@ -99,12 +99,9 @@ void cblas_sgemm(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE transa,
 
   constexpr int num_qpus = 8;
 
-  uint32_t a_handle, b_handle, c_handle;
-  uint32_t a_bus, b_bus, c_bus;
-
-  qmkl6.locate_virt((void *)a, a_handle, a_bus);
-  qmkl6.locate_virt((void *)b, b_handle, b_bus);
-  qmkl6.locate_virt((void *)c, c_handle, c_bus);
+  uint32_t c_handle;
+  const uint32_t a_bus = qmkl6.locate_virt(a), b_bus = qmkl6.locate_virt(b),
+                 c_bus = qmkl6.locate_virt(c, c_handle);
 
   qmkl6.unif[0] = (layout == CblasRowMajor) ? m : n;
   qmkl6.unif[1] = (layout == CblasRowMajor) ? n : m;
@@ -118,58 +115,57 @@ void cblas_sgemm(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE transa,
   qmkl6.unif[9] = qmkl6.bit_cast<uint32_t>(alpha);
   qmkl6.unif[10] = qmkl6.bit_cast<uint32_t>(beta);
 
-  qmkl6.execute_qpu_code(
-      (layout == CblasRowMajor && transa == CblasNoTrans &&
-       transb == CblasNoTrans)
-          ? qmkl6.qpu_sgemm_rnn_bus
-          : (layout == CblasRowMajor && transa == CblasNoTrans &&
-             transb == CblasTrans)
-                ? qmkl6.qpu_sgemm_rnt_bus
-                : (layout == CblasRowMajor && transa == CblasTrans &&
-                   transb == CblasNoTrans)
-                      ? qmkl6.qpu_sgemm_rtn_bus
-                      : (layout == CblasRowMajor && transa == CblasTrans &&
-                         transb == CblasTrans)
-                            ? qmkl6.qpu_sgemm_rtt_bus
-                            : (layout == CblasColMajor &&
-                               transa == CblasNoTrans && transb == CblasNoTrans)
-                                  ? qmkl6.qpu_sgemm_rnn_bus
-                                  : (layout == CblasColMajor &&
-                                     transa == CblasNoTrans &&
-                                     transb == CblasTrans)
-                                        ? qmkl6.qpu_sgemm_rtn_bus
-                                        : (layout == CblasColMajor &&
-                                           transa == CblasTrans &&
-                                           transb == CblasNoTrans)
-                                              ? qmkl6.qpu_sgemm_rnt_bus
-                                              : (layout == CblasColMajor &&
-                                                 transa == CblasTrans &&
-                                                 transb == CblasTrans)
-                                                    ? qmkl6.qpu_sgemm_rtt_bus
-                                                    : 0,
-      qmkl6.unif_bus, num_qpus, 1, c_handle);
+  qmkl6.execute_qpu_code((layout == CblasRowMajor && transa == CblasNoTrans &&
+                          transb == CblasNoTrans)
+                             ? qmkl6.qpu_sgemm_rnn_bus
+                         : (layout == CblasRowMajor && transa == CblasNoTrans &&
+                            transb == CblasTrans)
+                             ? qmkl6.qpu_sgemm_rnt_bus
+                         : (layout == CblasRowMajor && transa == CblasTrans &&
+                            transb == CblasNoTrans)
+                             ? qmkl6.qpu_sgemm_rtn_bus
+                         : (layout == CblasRowMajor && transa == CblasTrans &&
+                            transb == CblasTrans)
+                             ? qmkl6.qpu_sgemm_rtt_bus
+                         : (layout == CblasColMajor && transa == CblasNoTrans &&
+                            transb == CblasNoTrans)
+                             ? qmkl6.qpu_sgemm_rnn_bus
+                         : (layout == CblasColMajor && transa == CblasNoTrans &&
+                            transb == CblasTrans)
+                             ? qmkl6.qpu_sgemm_rtn_bus
+                         : (layout == CblasColMajor && transa == CblasTrans &&
+                            transb == CblasNoTrans)
+                             ? qmkl6.qpu_sgemm_rnt_bus
+                         : (layout == CblasColMajor && transa == CblasTrans &&
+                            transb == CblasTrans)
+                             ? qmkl6.qpu_sgemm_rtt_bus
+                             : 0,
+                         qmkl6.unif_bus, num_qpus, 1, c_handle);
 
   qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, c_handle);
 }
 
 void qmkl6_context::init_blas3(void) {
-  qpu_sgemm_rnn = (uint64_t *)alloc_memory(
-      sizeof(qpu_sgemm_rnn_orig), qpu_sgemm_rnn_handle, qpu_sgemm_rnn_bus);
+  qpu_sgemm_rnn =
+      (uint64_t *)alloc_memory(sizeof(qpu_sgemm_rnn_orig), qpu_sgemm_rnn_bus);
   memcpy(qpu_sgemm_rnn, qpu_sgemm_rnn_orig, sizeof(qpu_sgemm_rnn_orig));
-  qpu_sgemm_rnt = (uint64_t *)alloc_memory(
-      sizeof(qpu_sgemm_rnt_orig), qpu_sgemm_rnt_handle, qpu_sgemm_rnt_bus);
+
+  qpu_sgemm_rnt =
+      (uint64_t *)alloc_memory(sizeof(qpu_sgemm_rnt_orig), qpu_sgemm_rnt_bus);
   memcpy(qpu_sgemm_rnt, qpu_sgemm_rnt_orig, sizeof(qpu_sgemm_rnt_orig));
-  qpu_sgemm_rtn = (uint64_t *)alloc_memory(
-      sizeof(qpu_sgemm_rtn_orig), qpu_sgemm_rtn_handle, qpu_sgemm_rtn_bus);
+
+  qpu_sgemm_rtn =
+      (uint64_t *)alloc_memory(sizeof(qpu_sgemm_rtn_orig), qpu_sgemm_rtn_bus);
   memcpy(qpu_sgemm_rtn, qpu_sgemm_rtn_orig, sizeof(qpu_sgemm_rtn_orig));
-  qpu_sgemm_rtt = (uint64_t *)alloc_memory(
-      sizeof(qpu_sgemm_rtt_orig), qpu_sgemm_rtt_handle, qpu_sgemm_rtt_bus);
+
+  qpu_sgemm_rtt =
+      (uint64_t *)alloc_memory(sizeof(qpu_sgemm_rtt_orig), qpu_sgemm_rtt_bus);
   memcpy(qpu_sgemm_rtt, qpu_sgemm_rtt_orig, sizeof(qpu_sgemm_rtt_orig));
 }
 
 void qmkl6_context::finalize_blas3(void) {
-  free_memory(sizeof(qpu_sgemm_rtt_orig), qpu_sgemm_rtt_handle, qpu_sgemm_rtt);
-  free_memory(sizeof(qpu_sgemm_rtn_orig), qpu_sgemm_rtn_handle, qpu_sgemm_rtn);
-  free_memory(sizeof(qpu_sgemm_rnt_orig), qpu_sgemm_rnt_handle, qpu_sgemm_rnt);
-  free_memory(sizeof(qpu_sgemm_rnn_orig), qpu_sgemm_rnn_handle, qpu_sgemm_rnn);
+  free_memory(qpu_sgemm_rtt);
+  free_memory(qpu_sgemm_rtn);
+  free_memory(qpu_sgemm_rnt);
+  free_memory(qpu_sgemm_rnn);
 }

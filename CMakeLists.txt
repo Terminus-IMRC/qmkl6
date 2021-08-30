@@ -33,6 +33,20 @@ else (NO_QMKL6)
 
     pkg_check_modules(DRM_V3D REQUIRED libdrm_v3d)
 
+    pkg_check_modules(RPIMEMMGR librpimemmgr>=4.0.1)
+    if (NOT RPIMEMMGR_FOUND)
+        message(STATUS "Adding /opt/vc/lib/pkgconfig to PKG_CONFIG_PATH")
+        set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/vc/lib/pkgconfig")
+        pkg_check_modules(RPIMEMMGR librpimemmgr>=4.0.1)
+        if (NOT RPIMEMMGR_FOUND)
+            message(FATAL_ERROR "Raspberry Pi libraries required for "
+                                "librpimemmgr are not found even in "
+                                "/opt/vc/lib.  If you are building on non-RPi "
+                                "host, please specify the path via "
+                                "PKG_CONFIG_PATH.")
+        endif ()
+    endif ()
+
     add_subdirectory(include)
     add_subdirectory(src)
 

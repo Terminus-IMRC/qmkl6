@@ -19,14 +19,15 @@
 qmkl6_context qmkl6;
 
 qmkl6_context::qmkl6_context(void) {
-  drm_fd = open("/dev/dri/card0", O_RDWR);
-  if (drm_fd == -1) {
-    fprintf(stderr, "error: open: %s\n", strerror(errno));
-    XERBLA(drm_fd);
-  }
+  int ret;
+
+  ret = rpimemmgr_init(&rpimemmgr);
+  if (ret) XERBLA(ret);
 
   unif_size = sizeof(uint32_t) * 1024;
   unif = (uint32_t *)alloc_memory(unif_size, unif_handle, unif_bus);
+
+  drm_fd = rpimemmgr_borrow_drm_fd(&rpimemmgr);
 
   init_support();
   init_blas1();
@@ -48,81 +49,49 @@ qmkl6_context::~qmkl6_context(void) {
   finalize_blas1();
   finalize_support();
 
-  free_memory(unif_size, unif_handle, unif);
+  free_memory(unif);
 
-  ret = close(drm_fd);
-  if (ret) {
-    fprintf(stderr, "error: close: %s\n", strerror(errno));
-    XERBLA(ret);
-  }
-  drm_fd = -1;
+  ret = rpimemmgr_finalize(&rpimemmgr);
+  if (ret) XERBLA(ret);
+}
+
+void *qmkl6_context::alloc_memory(const size_t size, uint32_t &bus_addr) {
+  void *virt_addr;
+
+  const int ret = rpimemmgr_alloc_drm(size, &virt_addr, &bus_addr, &rpimemmgr);
+  if (ret) XERBLA(ret);
+
+  return virt_addr;
 }
 
 void *qmkl6_context::alloc_memory(const size_t size, uint32_t &handle,
                                   uint32_t &bus_addr) {
-  uint64_t mmap_offset;
+  void *const virt_addr = alloc_memory(size, bus_addr);
 
-  return alloc_memory(size, handle, bus_addr, mmap_offset);
+  handle = rpimemmgr_usraddr_to_handle(virt_addr, &rpimemmgr);
+
+  return virt_addr;
 }
 
-void *qmkl6_context::alloc_memory(const size_t size, uint32_t &handle,
-                                  uint32_t &bus_addr, uint64_t &mmap_offset) {
-  int ret;
+void qmkl6_context::free_memory(void *const virt_addr) {
+  const int ret = rpimemmgr_free_by_usraddr(virt_addr, &rpimemmgr);
 
-  ret = drm_v3d_create_bo(drm_fd, size, 0, &handle, &bus_addr);
-  if (ret) {
-    fprintf(stderr, "error: drm_v3d_create_bo: %s\n", strerror(errno));
-    XERBLA(ret);
-  }
-
-  ret = drm_v3d_mmap_bo(drm_fd, handle, 0, &mmap_offset);
-  if (ret) {
-    fprintf(stderr, "error: drm_v3d_mmap_bo: %s\n", strerror(errno));
-    XERBLA(ret);
-  }
-
-  void *const map =
-      mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, drm_fd, mmap_offset);
-  if (map == MAP_FAILED) {
-    fprintf(stderr, "error: mmap: %s\n", strerror(errno));
-    XERBLA(ret);
-  }
-
-  return map;
+  if (ret) XERBLA(ret);
 }
 
-void qmkl6_context::free_memory(const size_t size, const uint32_t handle,
-                                void *const map) {
-  int ret;
+uint32_t qmkl6_context::locate_virt(const void *const virt_addr) {
+  const uint32_t bus_addr = rpimemmgr_usraddr_to_busaddr(virt_addr, &rpimemmgr);
+  if (!bus_addr) XERBLA(1);
 
-  ret = munmap(map, size);
-  if (ret) {
-    fprintf(stderr, "error: munmap: %s\n", strerror(errno));
-    XERBLA(ret);
-  }
-
-  ret = drm_gem_close(drm_fd, handle);
-  if (ret) {
-    fprintf(stderr, "error: drm_gem_close: %s\n", strerror(errno));
-    XERBLA(ret);
-  }
+  return bus_addr;
 }
 
-void qmkl6_context::locate_virt(const void *const virt_addr, uint32_t &handle,
-                                uint32_t &bus_addr) {
-  const auto area = memory_map.upper_bound(virt_addr);
+uint32_t qmkl6_context::locate_virt(const void *const virt_addr,
+                                    uint32_t &handle) {
+  handle = rpimemmgr_usraddr_to_handle(virt_addr, &rpimemmgr);
+  if (!handle) XERBLA(1);
 
-  if (area == memory_map.begin() ||
-      !(std::prev(area)->first <= virt_addr &&
-        (uintptr_t)virt_addr < (uintptr_t)std::prev(area)->first +
-                                   std::prev(area)->second.alloc_size)) {
-    fprintf(stderr, "Memory area including %p is not known\n", virt_addr);
-    XERBLA(1);
-  }
-
-  handle = std::prev(area)->second.handle;
-  bus_addr = std::prev(area)->second.bus_addr_aligned +
-             ((uintptr_t)virt_addr - (uintptr_t)std::prev(area)->first);
+  return locate_virt(virt_addr);
 }
 
 void qmkl6_context::execute_qpu_code(const uint32_t qpu_code_bus,

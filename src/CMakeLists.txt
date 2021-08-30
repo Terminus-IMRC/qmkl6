@@ -1,4 +1,5 @@
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/include
+                    ${DRM_V3D_INCLUDE_DIRS} ${RPIMEMMGR_INCLUDE_DIRS})
 add_compile_options(-pipe -W -Wall -Wextra -O2 -g -std=c++17)
 
 function (generate_qhex6_from_py name input)
