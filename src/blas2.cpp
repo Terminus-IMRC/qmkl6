@@ -180,14 +180,14 @@ void cblas_stbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
     qmkl6.unif[4] = incx;
 
     qmkl6.execute_qpu_code(qmkl6.qpu_stbmv_bus, qmkl6.unif_bus, num_qpus, 1,
-                           a_handle);
+                           x_handle);
   }
 
   for (int i = 0, j = lda * n, k = incx * n; i < n_rem;
        ++i, j += lda, k += incx)
     x[k] *= a[j];
 
-  if (n > 0) qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, a_handle);
+  if (n > 0) qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, x_handle);
 }
 
 void cblas_ctbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
@@ -232,7 +232,7 @@ void cblas_ctbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
     qmkl6.unif[4] = incx;
 
     qmkl6.execute_qpu_code(qmkl6.qpu_ctbmv_bus, qmkl6.unif_bus, num_qpus, 1,
-                           a_handle);
+                           x_handle);
   }
 
   for (int i = 0, j = lda * n, k = incx * n; i < n_rem;
@@ -240,7 +240,7 @@ void cblas_ctbmv([[maybe_unused]] const CBLAS_LAYOUT layout,
     static_cast<std::complex<float> *>(x)[k] *=
         static_cast<const std::complex<float> *>(a)[j];
 
-  if (n > 0) qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, a_handle);
+  if (n > 0) qmkl6.wait_for_handles(qmkl6.timeout_ns, 1, x_handle);
 }
 
 void qmkl6_context::init_blas2(void) {
