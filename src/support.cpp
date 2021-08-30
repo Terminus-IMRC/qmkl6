@@ -75,15 +75,6 @@ void mkl_free(void* const a_ptr) {
   qmkl6.memory_map.erase(area);
 }
 
-uint64_t mkl_mem_stat(unsigned* AllocatedBuffers) {
-  *AllocatedBuffers = qmkl6.memory_map.size();
-
-  uint64_t AllocatedBytes = 0;
-  for (auto& mem : qmkl6.memory_map)
-    AllocatedBytes += mem.second.alloc_size_aligned;
-  return AllocatedBytes;
-}
-
 void qmkl6_context::init_support(void) {}
 
 void qmkl6_context::finalize_support(void) {}
