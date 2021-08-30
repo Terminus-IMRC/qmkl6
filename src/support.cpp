@@ -70,4 +70,10 @@ void mkl_free(void* const a_ptr) {
 
 void qmkl6_context::init_support(void) {}
 
-void qmkl6_context::finalize_support(void) {}
+void qmkl6_context::finalize_support(void) {
+  if (!aligned_memory_map.empty()) {
+    fprintf(stderr, "error: Memory was not all freed (%zu areas remaining)\n",
+            aligned_memory_map.size());
+    XERBLA(1);
+  }
+}
